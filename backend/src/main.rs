@@ -1,30 +1,14 @@
-use axum::{routing::post, Router};
-use std::net::SocketAddr;
-use tower_http::trace::TraceLayer;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+pub mod middleware;
+pub mod routes;
 
-mod routes;
-mod error;
+use routes::{sign, verify, encrypt, decrypt, keys, key_import};
+use middleware::auth::Auth;
 
-use routes::{sign::sign_handler, verify::verify_handler, keys::list_keys_handler};
-
-#[tokio::main]
-async fn main() {
-    tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer())
-        .init();
-
-    let app = Router::new()
-        .route("/sign", post(sign_handler))
-        .route("/verify", post(verify_handler))
-        .route("/keys/list", post(list_keys_handler))
-        .layer(TraceLayer::new_for_http());
-
-    let addr = SocketAddr::from(([0, 0, 0, 0], 8000));
-    tracing::info!("SIGMA backend listening on {}", addr);
-
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
-}
+let app = Router::new()
+    .route("/sign", post(sign::sign))
+    .route("/verify", post(verify::verify))
+    .route("/encrypt", post(encrypt::encrypt))
+    .route("/decrypt", post(decrypt::decrypt))
+    .route("/keys/list", get(keys::list_keys))
+    .route("/keys/import", post(key_import::import_key).layer(axum::middleware::from_fn(auth)))
+    .layer(TraceLayer::new_for_http());
