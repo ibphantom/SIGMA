@@ -1,77 +1,62 @@
-module Pages.Sign exposing (Msg(..), view, init, update)
+module Sign exposing (Model, Msg(..), init, update, view)
 
-import Browser.File exposing (File)
-import File.Select as Select
-import Html exposing (Html, button, div, input, label, text)
-import Html.Attributes exposing (for, id, type_)
-import Html.Events exposing (onClick)
+import Html exposing (..)
+import Html.Attributes exposing (..)
+import Html.Events exposing (onClick, onInput)
 import Http
+import Json.Decode as Decode
 import Json.Encode as Encode
-import File exposing (toBytes)
 
 
 -- MODEL
 
 type alias Model =
-    { file : Maybe File
-    , status : String
+    { input : String
+    , result : String
+    , status : Maybe String
+    , loading : Bool
     }
 
-init : ( Model, Cmd Msg )
+init : Model
 init =
-    ( { file = Nothing, status = "" }
-    , Cmd.none
-    )
+    { input = ""
+    , result = ""
+    , status = Nothing
+    , loading = False
+    }
+
+
+-- MESSAGES
+
+type Msg
+    = InputChanged String
+    | Submit
+    | SignCompleted (Result Http.Error String)
 
 
 -- UPDATE
 
-type Msg
-    = FileSelected File
-    | Upload
-    | UploadResponse (Result Http.Error String)
-
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        FileSelected file ->
-            ( { model | file = Just file }, Cmd.none )
+        InputChanged str ->
+            ( { model | input = str }, Cmd.none )
 
-        Upload ->
-            case model.file of
-                Just f ->
-                    ( model
-                    , toBytes f |> Task.attempt (Result.mapError (always Http.BadBody) >> UploadFile f)
-                    )
+        Submit ->
+            if String.isEmpty model.input then
+                ( { model | status = Just "Input cannot be empty." }, Cmd.none )
+            else
+                ( { model | loading = True, status = Nothing }
+                , signRequest model.input
+                )
 
-                Nothing ->
-                    ( { model | status = "No file selected." }, Cmd.none )
+        SignCompleted result ->
+            case result of
+                Ok body ->
+                    ( { model | result = body, loading = False, status = Just "Signed successfully." }, Cmd.none )
 
-        UploadFile file (Ok bytes) ->
-            let
-                body = Http.multipartBody [ Http.filePart "file" file ]
-
-                request =
-                    Http.request
-                        { method = "POST"
-                        , headers = []
-                        , url = "/sign"
-                        , body = body
-                        , expect = Http.expectString UploadResponse
-                        , timeout = Nothing
-                        , tracker = Nothing
-                        }
-            in
-            ( model, Http.send UploadResponse request )
-
-        UploadFile _ (Err _) ->
-            ( { model | status = "Failed to read file." }, Cmd.none )
-
-        UploadResponse (Ok msg) ->
-            ( { model | status = "Success: " ++ msg }, Cmd.none )
-
-        UploadResponse (Err err) ->
-            ( { model | status = "Error: " ++ Debug.toString err }, Cmd.none )
+                Err _ ->
+                    ( { model | loading = False, status = Just "Signing failed." }, Cmd.none )
 
 
 -- VIEW
@@ -79,7 +64,38 @@ update msg model =
 view : Model -> Html Msg
 view model =
     div []
-        [ input [ type_ "file", id "file-upload", onClick (Select.file FileSelected) ] []
-        , button [ onClick Upload ] [ text "Upload and Sign" ]
-        , div [] [ text model.status ]
+        [ h2 [] [ text "Sign Message" ]
+        , textarea
+            [ placeholder "Enter text to sign..."
+            , value model.input
+            , onInput InputChanged
+            ]
+            []
+        , button [ onClick Submit, disabled model.loading ]
+            [ text (if model.loading then "Signing..." else "Sign") ]
+        , case model.status of
+            Just msg -> div [ class "status" ] [ text msg ]
+            Nothing -> text ""
+        , if not (String.isEmpty model.result) then
+            div [ class "result" ]
+                [ h3 [] [ text "Signature" ]
+                , pre [] [ text model.result ]
+                ]
+          else
+            text ""
         ]
+
+
+-- HTTP
+
+signRequest : String -> Cmd Msg
+signRequest message =
+    let
+        body =
+            Encode.object [ ( "message", Encode.string message ) ]
+    in
+    Http.post
+        { url = "/api/sign"
+        , body = Http.jsonBody body
+        , expect = Http.expectString SignCompleted
+        }
