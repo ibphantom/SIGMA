@@ -1,66 +1,63 @@
-module Pages.Decrypt exposing (Msg(..), init, update, view)
+module Pages.Decrypt exposing (Model, Msg(..), init, update, view)
 
-import Browser.File exposing (File)
-import File.Select as Select
-import Html exposing (Html, button, div, input, text)
-import Html.Attributes exposing (type_)
-import Html.Events exposing (onClick)
+import Browser.Dom
+import Html exposing (..)
+import Html.Attributes exposing (..)
+import Html.Events exposing (onClick, onInput)
 import Http
+import Json.Decode as Decode
+import Json.Encode as Encode
 
 
 -- MODEL
 
 type alias Model =
-    { file : Maybe File
-    , status : String
+    { input : String
+    , result : String
+    , status : Maybe String
+    , loading : Bool
     }
 
-init : ( Model, Cmd Msg )
+init : Model
 init =
-    ( { file = Nothing, status = "" }
-    , Cmd.none
-    )
+    { input = ""
+    , result = ""
+    , status = Nothing
+    , loading = False
+    }
+
+
+-- MESSAGES
+
+type Msg
+    = InputChanged String
+    | Submit
+    | DecryptCompleted (Result Http.Error String)
 
 
 -- UPDATE
 
-type Msg
-    = FileSelected File
-    | Submit
-    | UploadResponse (Result Http.Error String)
-
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        FileSelected file ->
-            ( { model | file = Just file }, Cmd.none )
+        InputChanged str ->
+            ( { model | input = str }, Cmd.none )
 
         Submit ->
-            case model.file of
-                Just f ->
-                    let
-                        body = Http.multipartBody [ Http.filePart "file" f ]
-                        request =
-                            Http.request
-                                { method = "POST"
-                                , headers = []
-                                , url = "/decrypt"
-                                , body = body
-                                , expect = Http.expectString UploadResponse
-                                , timeout = Nothing
-                                , tracker = Nothing
-                                }
-                    in
-                    ( model, Http.send UploadResponse request )
+            if String.isEmpty model.input then
+                ( { model | status = Just "Input cannot be empty." }, Cmd.none )
+            else
+                ( { model | loading = True, status = Nothing }
+                , decryptRequest model.input
+                )
 
-                Nothing ->
-                    ( { model | status = "Please select a file." }, Cmd.none )
+        DecryptCompleted result ->
+            case result of
+                Ok body ->
+                    ( { model | result = body, loading = False, status = Just "Decryption successful." }, Cmd.none )
 
-        UploadResponse (Ok msg) ->
-            ( { model | status = "Decrypted: " ++ msg }, Cmd.none )
-
-        UploadResponse (Err err) ->
-            ( { model | status = "Error: " ++ Debug.toString err }, Cmd.none )
+                Err _ ->
+                    ( { model | loading = False, status = Just "Decryption failed." }, Cmd.none )
 
 
 -- VIEW
@@ -68,7 +65,38 @@ update msg model =
 view : Model -> Html Msg
 view model =
     div []
-        [ input [ type_ "file", onClick (Select.file FileSelected) ] []
-        , button [ onClick Submit ] [ text "Decrypt" ]
-        , div [] [ text model.status ]
+        [ h2 [] [ text "Decrypt Message" ]
+        , textarea
+            [ placeholder "Enter encrypted text..."
+            , value model.input
+            , onInput InputChanged
+            ]
+            []
+        , button [ onClick Submit, disabled model.loading ]
+            [ text (if model.loading then "Decrypting..." else "Decrypt") ]
+        , case model.status of
+            Just msg -> div [ class "status" ] [ text msg ]
+            Nothing -> text ""
+        , if not (String.isEmpty model.result) then
+            div [ class "result" ]
+                [ h3 [] [ text "Decrypted Output" ]
+                , pre [] [ text model.result ]
+                ]
+          else
+            text ""
         ]
+
+
+-- HTTP
+
+decryptRequest : String -> Cmd Msg
+decryptRequest message =
+    let
+        body =
+            Encode.object [ ( "message", Encode.string message ) ]
+    in
+    Http.post
+        { url = "/api/decrypt"
+        , body = Http.jsonBody body
+        , expect = Http.expectString DecryptCompleted
+        }
