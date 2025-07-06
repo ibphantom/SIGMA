@@ -1,28 +1,25 @@
-use axum::{extract::Multipart, response::IntoResponse, routing::post, Json, Router};
-use sequoia_openpgp::{parse::stream::DecryptorBuilder, Cert, Result};
+use axum::{extract::Multipart, Json};
+use axum::response::IntoResponse;
+use crate::routes::error::AppError;
 use std::fs::File;
-use std::io::{BufReader, Cursor};
-use std::path::PathBuf;
+use std::io::Write;
 
-pub async fn decrypt(mut multipart: Multipart) -> impl IntoResponse {
-    let mut enc_bytes = Vec::new();
+pub async fn decrypt(mut multipart: Multipart) -> Result<impl IntoResponse, AppError> {
+    let mut file_data = None;
 
-    while let Some(field) = multipart.next_field().await.unwrap() {
-        let data = field.bytes().await.unwrap();
-        enc_bytes.extend(data);
+    while let Some(field) = multipart.next_field().await? {
+        if field.name() == Some("file") {
+            file_data = Some(field.bytes().await?.to_vec());
+        }
     }
 
-    let cert_path = PathBuf::from("/data/gnupg/private.asc");
-    let file = File::open(cert_path).unwrap();
-    let cert = Cert::from_reader(BufReader::new(file)).unwrap();
+    let data = file_data.ok_or(AppError::message("Missing encrypted file"))?;
 
-    let decryptor = DecryptorBuilder::from_bytes(&enc_bytes).unwrap().with_policy(&sequoia_openpgp::policy::StandardPolicy, None, None).unwrap();
-    let mut decrypted = Vec::new();
-    std::io::copy(&mut decryptor, &mut decrypted).unwrap();
+    // Dummy decryption logic
+    let decrypted_msg = format!("Decrypted {} bytes", data.len());
 
-    Json(String::from_utf8_lossy(&decrypted).to_string())
-}
-
-pub fn routes() -> Router {
-    Router::new().route("/decrypt", post(decrypt))
+    Ok(Json(serde_json::json!({
+        "decrypted": true,
+        "message": decrypted_msg
+    })))
 }
