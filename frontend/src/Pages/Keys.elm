@@ -1,9 +1,7 @@
-module Pages.Keys exposing (Msg(..), init, update, view)
+module Pages.Keys exposing (Model, Msg(..), init, update, view)
 
-import Browser.File exposing (File)
-import File.Select as Select
-import Html exposing (Html, button, div, input, text)
-import Html.Attributes exposing (type_)
+import Html exposing (..)
+import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
 import Http
 import Json.Decode as Decode
@@ -11,76 +9,53 @@ import Json.Decode as Decode
 
 -- MODEL
 
+type alias KeyInfo =
+    { label : String
+    , fingerprint : String
+    }
+
 type alias Model =
-    { keys : List String
-    , status : String
-    , file : Maybe File
+    { keys : List KeyInfo
+    , status : Maybe String
+    , loading : Bool
     }
 
 init : ( Model, Cmd Msg )
 init =
-    ( { keys = [], status = "Loading...", file = Nothing }, getKeys )
+    ( { keys = [], status = Nothing, loading = False }, fetchKeys )
+
+
+-- MESSAGES
+
+type Msg
+    = GotKeys (Result Http.Error (List KeyInfo))
+    | WipeKeys
+    | RegenerateKeys
+    | KeyOperationCompleted (Result Http.Error String)
 
 
 -- UPDATE
 
-type Msg
-    = GotKeys (Result Http.Error (List String))
-    | FileSelected File
-    | Submit
-    | UploadResponse (Result Http.Error String)
-
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        GotKeys (Ok keyList) ->
-            ( { model | keys = keyList, status = "Loaded." }, Cmd.none )
+        GotKeys (Ok keys) ->
+            ( { model | keys = keys, loading = False }, Cmd.none )
 
-        GotKeys (Err err) ->
-            ( { model | status = "Error: " ++ Debug.toString err }, Cmd.none )
+        GotKeys (Err _) ->
+            ( { model | status = Just "Failed to load keys.", loading = False }, Cmd.none )
 
-        FileSelected file ->
-            ( { model | file = Just file }, Cmd.none )
+        WipeKeys ->
+            ( { model | loading = True }, performKeyOp "/api/keys/wipe" )
 
-        Submit ->
-            case model.file of
-                Just f ->
-                    let
-                        body = Http.multipartBody [ Http.filePart "key" f ]
-                        request =
-                            Http.request
-                                { method = "POST"
-                                , headers = []
-                                , url = "/keys/import"
-                                , body = body
-                                , expect = Http.expectString UploadResponse
-                                , timeout = Nothing
-                                , tracker = Nothing
-                                }
-                    in
-                    ( model, Http.send UploadResponse request )
+        RegenerateKeys ->
+            ( { model | loading = True }, performKeyOp "/api/keys/regenerate" )
 
-                Nothing ->
-                    ( { model | status = "Please select a key file." }, Cmd.none )
+        KeyOperationCompleted (Ok msg) ->
+            ( { model | status = Just msg, loading = False }, fetchKeys )
 
-        UploadResponse (Ok msg) ->
-            ( { model | status = "Uploaded: " ++ msg }, getKeys )
-
-        UploadResponse (Err err) ->
-            ( { model | status = "Upload error: " ++ Debug.toString err }, Cmd.none )
-
-
--- HTTP
-
-getKeys : Cmd Msg
-getKeys =
-    let
-        decoder = Decode.field "keys" (Decode.list Decode.string)
-    in
-    Http.get
-        { url = "/keys/list"
-        , expect = Http.expectJson GotKeys decoder
-        }
+        KeyOperationCompleted (Err _) ->
+            ( { model | status = Just "Key operation failed.", loading = False }, Cmd.none )
 
 
 -- VIEW
@@ -88,7 +63,51 @@ getKeys =
 view : Model -> Html Msg
 view model =
     div []
-        ([ input [ type_ "file", onClick (Select.file FileSelected) ] []
-         , button [ onClick Submit ] [ text "Upload Key" ]
-         , div [] [ text model.status ]
-         ] ++ List.map (\k -> div [] [ text k ]) model.keys)
+        [ h2 [] [ text "GPG Key Management" ]
+        , button [ onClick WipeKeys, disabled model.loading ] [ text "Wipe All Keys" ]
+        , button [ onClick RegenerateKeys, disabled model.loading ] [ text "Regenerate Keys" ]
+        , case model.status of
+            Just msg -> div [ class "status" ] [ text msg ]
+            Nothing -> text ""
+        , if model.loading then
+            div [] [ text "Loading..." ]
+          else
+            div []
+                (List.map viewKey model.keys)
+        ]
+
+
+viewKey : KeyInfo -> Html msg
+viewKey key =
+    div [ class "key-entry" ]
+        [ h3 [] [ text key.label ]
+        , p [] [ text ("Fingerprint: " ++ key.fingerprint) ]
+        ]
+
+
+-- HTTP
+
+fetchKeys : Cmd Msg
+fetchKeys =
+    Http.get
+        { url = "/api/keys"
+        , expect = Http.expectJson GotKeys keyListDecoder
+        }
+
+performKeyOp : String -> Cmd Msg
+performKeyOp url =
+    Http.post
+        { url = url
+        , body = Http.emptyBody
+        , expect = Http.expectString KeyOperationCompleted
+        }
+
+keyDecoder : Decode.Decoder KeyInfo
+keyDecoder =
+    Decode.map2 KeyInfo
+        (Decode.field "label" Decode.string)
+        (Decode.field "fingerprint" Decode.string)
+
+keyListDecoder : Decode.Decoder (List KeyInfo)
+keyListDecoder =
+    Decode.list keyDecoder
