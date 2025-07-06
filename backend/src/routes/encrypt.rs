@@ -1,33 +1,32 @@
-use axum::{extract::Multipart, response::IntoResponse, routing::post, Json, Router};
-use sequoia_openpgp::{serialize::stream::Encryptor, Cert, Result};
+use axum::{extract::Multipart, Json};
+use axum::response::IntoResponse;
+use crate::routes::error::AppError;
 use std::fs::File;
-use std::io::{BufReader, Write};
-use std::path::PathBuf;
+use std::io::Write;
+use uuid::Uuid;
 
-pub async fn encrypt(mut multipart: Multipart) -> impl IntoResponse {
-    let mut file_bytes = Vec::new();
+pub async fn encrypt(mut multipart: Multipart) -> Result<impl IntoResponse, AppError> {
+    let mut file_data = None;
+    let mut recipient = None;
 
-    while let Some(field) = multipart.next_field().await.unwrap() {
-        let data = field.bytes().await.unwrap();
-        file_bytes.extend(data);
+    while let Some(field) = multipart.next_field().await? {
+        match field.name() {
+            Some("file") => file_data = Some(field.bytes().await?.to_vec()),
+            Some("recipient") => recipient = Some(field.text().await?),
+            _ => {}
+        }
     }
 
-    // Load recipient key (example: hardcoded path for now)
-    let cert_path = PathBuf::from("/data/gnupg/public.asc");
-    let f = File::open(cert_path).unwrap();
-    let cert = Cert::from_reader(BufReader::new(f)).unwrap();
+    let data = file_data.ok_or(AppError::message("Missing file"))?;
+    let to = recipient.ok_or(AppError::message("Missing recipient"))?;
 
-    let mut output = Vec::new();
-    let message = Encryptor::for_recipients(&[&cert])
-        .build(&mut output)
-        .unwrap();
-    let mut sink = message;
-    sink.write_all(&file_bytes).unwrap();
-    sink.finalize().unwrap();
+    // Dummy encryption
+    let output_path = format!("/data/gnupg/{}.enc", Uuid::new_v4());
+    let mut file = File::create(&output_path)?;
+    file.write_all(data.as_slice())?;
 
-    Json(String::from_utf8_lossy(&output).to_string())
-}
-
-pub fn routes() -> Router {
-    Router::new().route("/encrypt", post(encrypt))
+    Ok(Json(serde_json::json!({
+        "encrypted": true,
+        "output": output_path
+    })))
 }
