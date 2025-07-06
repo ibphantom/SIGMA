@@ -4,7 +4,6 @@ services:
   backend:
     build: ./backend
     environment:
-      - AUTH_TOKEN=${AUTH_TOKEN}
     volumes:
       - ./data:/data/gnupg
     ports:
