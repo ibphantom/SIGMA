@@ -1,79 +1,68 @@
-module Pages.Verify exposing (Msg(..), init, update, view)
+module Pages.Verify exposing (Model, Msg(..), init, update, view)
 
-import Browser.File exposing (File)
-import File.Select as Select
-import Html exposing (Html, button, div, input, text)
-import Html.Attributes exposing (type_)
-import Html.Events exposing (onClick)
+import Html exposing (..)
+import Html.Attributes exposing (..)
+import Html.Events exposing (onClick, onInput)
 import Http
-import Json.Encode
-import File exposing (toBytes)
-import Task
+import Json.Decode as Decode
+import Json.Encode as Encode
 
 
 -- MODEL
 
 type alias Model =
-    { file : Maybe File
-    , sig : Maybe File
-    , status : String
+    { message : String
+    , signature : String
+    , result : String
+    , status : Maybe String
+    , loading : Bool
     }
 
-init : ( Model, Cmd Msg )
+init : Model
 init =
-    ( { file = Nothing, sig = Nothing, status = "" }
-    , Cmd.none
-    )
+    { message = ""
+    , signature = ""
+    , result = ""
+    , status = Nothing
+    , loading = False
+    }
+
+
+-- MESSAGES
+
+type Msg
+    = MessageChanged String
+    | SignatureChanged String
+    | Submit
+    | VerifyCompleted (Result Http.Error String)
 
 
 -- UPDATE
 
-type Msg
-    = FileSelected File
-    | SigSelected File
-    | Submit
-    | UploadResponse (Result Http.Error String)
-
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        FileSelected file ->
-            ( { model | file = Just file }, Cmd.none )
+        MessageChanged str ->
+            ( { model | message = str }, Cmd.none )
 
-        SigSelected sig ->
-            ( { model | sig = Just sig }, Cmd.none )
+        SignatureChanged str ->
+            ( { model | signature = str }, Cmd.none )
 
         Submit ->
-            case ( model.file, model.sig ) of
-                ( Just f, Just s ) ->
-                    let
-                        body =
-                            Http.multipartBody
-                                [ Http.filePart "file" f
-                                , Http.filePart "signature" s
-                                ]
+            if String.isEmpty model.message || String.isEmpty model.signature then
+                ( { model | status = Just "Message and signature are required." }, Cmd.none )
+            else
+                ( { model | loading = True, status = Nothing }
+                , verifyRequest model.message model.signature
+                )
 
-                        request =
-                            Http.request
-                                { method = "POST"
-                                , headers = []
-                                , url = "/verify"
-                                , body = body
-                                , expect = Http.expectString UploadResponse
-                                , timeout = Nothing
-                                , tracker = Nothing
-                                }
-                    in
-                    ( model, Http.send UploadResponse request )
+        VerifyCompleted result ->
+            case result of
+                Ok body ->
+                    ( { model | result = body, loading = False, status = Just "Verification complete." }, Cmd.none )
 
-                _ ->
-                    ( { model | status = "Missing file or signature." }, Cmd.none )
-
-        UploadResponse (Ok msg) ->
-            ( { model | status = "Success: " ++ msg }, Cmd.none )
-
-        UploadResponse (Err err) ->
-            ( { model | status = "Error: " ++ Debug.toString err }, Cmd.none )
+                Err _ ->
+                    ( { model | loading = False, status = Just "Verification failed." }, Cmd.none )
 
 
 -- VIEW
@@ -81,8 +70,47 @@ update msg model =
 view : Model -> Html Msg
 view model =
     div []
-        [ input [ type_ "file", onClick (Select.file FileSelected) ] []
-        , input [ type_ "file", onClick (Select.file SigSelected) ] []
-        , button [ onClick Submit ] [ text "Verify" ]
-        , div [] [ text model.status ]
+        [ h2 [] [ text "Verify Signature" ]
+        , textarea
+            [ placeholder "Message"
+            , value model.message
+            , onInput MessageChanged
+            ]
+            []
+        , textarea
+            [ placeholder "Signature"
+            , value model.signature
+            , onInput SignatureChanged
+            ]
+            []
+        , button [ onClick Submit, disabled model.loading ]
+            [ text (if model.loading then "Verifying..." else "Verify") ]
+        , case model.status of
+            Just msg -> div [ class "status" ] [ text msg ]
+            Nothing -> text ""
+        , if not (String.isEmpty model.result) then
+            div [ class "result" ]
+                [ h3 [] [ text "Verification Result" ]
+                , pre [] [ text model.result ]
+                ]
+          else
+            text ""
         ]
+
+
+-- HTTP
+
+verifyRequest : String -> String -> Cmd Msg
+verifyRequest msg sig =
+    let
+        body =
+            Encode.object
+                [ ( "message", Encode.string msg )
+                , ( "signature", Encode.string sig )
+                ]
+    in
+    Http.post
+        { url = "/api/verify"
+        , body = Http.jsonBody body
+        , expect = Http.expectString VerifyCompleted
+        }
