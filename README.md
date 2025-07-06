@@ -40,6 +40,6 @@ SIGMA is a secure, browser-based platform for digitally signing media and conduc
 ## 🚀 Getting Started
 
 ```bash
-git clone https://github.com/yourusername/sigma.git
+git clone https://github.com/ibphantom/sigma.git
 cd sigma
 docker-compose up --build
