@@ -1,14 +1,44 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8" />
-    <title>SIGMA</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script src="elm.js"></script>
-    <script>
-      Elm.Main.init({ node: document.getElementById("root") });
-    </script>
-  </body>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#000000" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="icon" href="/icons/icon-192.png" />
+  <title>SIGMA</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui, sans-serif;
+      background-color: #0e0e0e;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+    #root {
+      width: 100%;
+      max-width: 900px;
+      padding: 2rem;
+    }
+  </style>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/service-worker.js').catch(function(error) {
+        console.error('Service Worker registration failed:', error);
+      });
+    }
+  </script>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="/elm.js"></script>
+  <script>
+    var app = Elm.Main.init({
+      node: document.getElementById('root')
+    });
+  </script>
+</body>
 </html>
