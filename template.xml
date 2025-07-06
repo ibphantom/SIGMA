@@ -1,0 +1,15 @@
+<Container>
+  <Name>SIGMA</Name>
+  <Repository>yourdockerhub/sigma</Repository>
+  <Registry>https://hub.docker.com/r/yourdockerhub/sigma</Registry>
+  <Support>https://github.com/yourusername/sigma/issues</Support>
+  <Overview>Secure digital signature and encrypted messaging platform using OpenPGP</Overview>
+  <Category>Security:Tools</Category>
+  <WebUI>http://[IP]:[PORT:34999]</WebUI>
+  <Icon>https://raw.githubusercontent.com/yourusername/sigma/main/logo.png</Icon>
+
+  <Config Name="AppData Config Path" Target="/data/gnupg" Default="/mnt/user/appdata/SIGMA" Type="Path" Description="Persistent key storage" Display="always" Required="true" Mask="false"/>
+  <Config Name="Frontend Port" Target="34999" Default="34999" Type="Port" Description="Port for the web UI" Display="always" Required="true" Mask="false"/>
+  <Config Name="Backend Port" Target="34998" Default="34998" Type="Port" Description="Port for the backend API" Display="always" Required="true" Mask="false"/>
+  <Config Name="Network Mode" Target="network_mode" Default="bridge" Type="Variable" Description="bridge, host, or custom docker network" Display="always" Required="false" Mask="false"/>
+</Container>
