@@ -3,10 +3,9 @@ FROM node:18-alpine AS builder
 WORKDIR /app
 RUN npm install -g elm@0.19.1
 
-COPY elm.json .
-COPY src ./src
+COPY frontend/elm.json .
+COPY frontend/src ./src
 RUN mkdir dist && elm make src/Main.elm --optimize --output=dist/elm.js
-COPY dist ./dist
 
 FROM node:18-alpine
 WORKDIR /app
