@@ -1,117 +1,62 @@
-module Pages.Encrypt exposing (Model, Msg(..), init, update, view)
+module Pages.Encrypt exposing (view)
 
-import Browser.Dom
-import Html exposing (..)
+import Html exposing (Html, div, input, button, label, text)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onClick, onInput)
-import Http
-import Json.Decode as Decode
-import Json.Encode as Encode
+import Html.Events exposing (onClick)
+import File exposing (File)
+import File.Select as Select
 
-
--- MODEL
 
 type alias Model =
-    { input : String
-    , result : String
-    , status : Maybe String
-    , loading : Bool
-    }
-
-init : Model
-init =
-    { input = ""
-    , result = ""
-    , status = Nothing
-    , loading = False
+    { selectedFile : Maybe File
+    , recipient : String
+    , status : Status
     }
 
 
--- MESSAGES
+type Status
+    = Idle
+    | Encrypting
+    | Success
+    | Failure String
+
 
 type Msg
-    = InputChanged String
+    = SelectFile
+    | FileSelected File
+    | RecipientChanged String
     | Submit
-    | EncryptCompleted (Result Http.Error String)
+    | EncryptionResult (Result String ())
 
 
--- UPDATE
-
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
-    case msg of
-        InputChanged str ->
-            ( { model | input = str }, Cmd.none )
-
-        Submit ->
-            if String.isEmpty model.input then
-                ( { model | status = Just "Input cannot be empty." }, Cmd.none )
-            else
-                ( { model | loading = True, status = Nothing }
-                , encryptRequest model.input
-                )
-
-        EncryptCompleted result ->
-            case result of
-                Ok body ->
-                    ( { model
-                        | result = body
-                        , loading = False
-                        , status = Just "Encryption successful."
-                      }
-                    , Cmd.none
-                    )
-
-                Err _ ->
-                    ( { model
-                        | loading = False
-                        , status = Just "Encryption failed. Please try again."
-                      }
-                    , Cmd.none
-                    )
+view : Html Msg
+view =
+    Html.map identity <|
+        viewInternal { selectedFile = Nothing, recipient = "", status = Idle }
 
 
--- VIEW
-
-view : Model -> Html Msg
-view model =
+viewInternal : Model -> Html Msg
+viewInternal model =
     div [ class "encrypt-page" ]
-        [ h2 [] [ text "Encrypt Message" ]
-        , textarea
-            [ placeholder "Enter your message here..."
-            , value model.input
-            , onInput InputChanged
-            ]
-            []
-        , button
-            [ onClick Submit, disabled model.loading ]
-            [ text (if model.loading then "Encrypting..." else "Encrypt") ]
-        , case model.status of
-            Just msg ->
-                div [ class "status" ] [ text msg ]
-
-            Nothing ->
-                text ""
-        , if not (String.isEmpty model.result) then
-            div [ class "result" ]
-                [ h3 [] [ text "Encrypted Output" ]
-                , pre [] [ text model.result ]
-                ]
-          else
-            text ""
+        [ label [] [ text "Recipient Key ID or Email:" ]
+        , input [ type_ "text", placeholder "key-id or email", onInput RecipientChanged ] []
+        , button [ onClick SelectFile ] [ text "Choose File" ]
+        , button [ onClick Submit ] [ text "Encrypt" ]
+        , viewStatus model.status
         ]
 
 
--- HTTP
+viewStatus : Status -> Html msg
+viewStatus status =
+    case status of
+        Idle ->
+            text ""
 
-encryptRequest : String -> Cmd Msg
-encryptRequest message =
-    let
-        body =
-            Encode.object [ ( "message", Encode.string message ) ]
-    in
-    Http.post
-        { url = "/api/encrypt"
-        , body = Http.jsonBody body
-        , expect = Http.expectString EncryptCompleted
-        }
+        Encrypting ->
+            div [ class "status encrypting" ] [ text "Encrypting..." ]
+
+        Success ->
+            div [ class "status success" ] [ text "Encrypted successfully!" ]
+
+        Failure err ->
+            div [ class "status error" ] [ text ("Error: " ++ err) ]
