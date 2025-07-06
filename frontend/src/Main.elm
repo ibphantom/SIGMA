@@ -13,9 +13,7 @@ import Pages.Encrypt as Encrypt
 import Pages.Decrypt as Decrypt
 import Pages.Keys as Keys
 
-
 -- ROUTES
-
 
 type Page
     = Home
@@ -25,7 +23,6 @@ type Page
     | DecryptPage
     | KeysPage
     | NotFound
-
 
 routeParser : Parser (Page -> a) a
 routeParser =
@@ -38,18 +35,14 @@ routeParser =
         , map KeysPage (s "keys")
         ]
 
-
 -- MODEL
-
 
 type alias Model =
     { key : Nav.Key
     , page : Page
     }
 
-
 -- INIT
-
 
 init : () -> Url -> Nav.Key -> ( Model, Cmd Msg )
 init _ url key =
@@ -61,14 +54,11 @@ init _ url key =
     in
     ( { key = key, page = page }, Cmd.none )
 
-
 -- UPDATE
-
 
 type Msg
     = LinkClicked Browser.UrlRequest
     | UrlChanged Url
-
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
@@ -87,15 +77,13 @@ update msg model =
             in
             ( { model | page = page }, Cmd.none )
 
-
 -- VIEW
-
 
 view : Model -> Html Msg
 view model =
     div []
         [ nav []
-            [ a [ href "#/", Html.Events.onClick (LinkClicked (Browser.Internal (Url.fromString "/" |> Maybe.withDefault (Url.fromString "/" |> Maybe.withDefault (Debug.todo "invalid"))))) ] [ text "Home" ]
+            [ a [ href "/" ] [ text "Home" ]
             , text " | "
             , a [ href "/sign" ] [ text "Sign" ]
             , text " | "
@@ -110,7 +98,6 @@ view model =
         , div [] [ renderPage model.page ]
         ]
 
-
 renderPage : Page -> Html msg
 renderPage page =
     case page of
@@ -122,9 +109,7 @@ renderPage page =
         KeysPage -> Keys.view
         NotFound -> div [] [ text "404 - Page Not Found" ]
 
-
 -- MAIN
-
 
 main : Program () Model Msg
 main =
