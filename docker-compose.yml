@@ -5,12 +5,12 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    environment:
-      - RUST_LOG=info
-    ports:
-      - "${SIGMA_BACKEND_PORT:-34998}:8000"
     volumes:
       - ${SIGMA_DATA_PATH:-/mnt/user/appdata/SIGMA}:/data/gnupg
+    ports:
+      - "${SIGMA_BACKEND_PORT:-34998}:8000"
+    environment:
+      - RUST_LOG=info
     restart: unless-stopped
     network_mode: ${SIGMA_NETWORK_MODE:-bridge}
 
@@ -20,5 +20,9 @@ services:
       dockerfile: Dockerfile
     ports:
       - "${SIGMA_FRONTEND_PORT:-34999}:3000"
+    depends_on:
+      - backend
     restart: unless-stopped
     network_mode: ${SIGMA_NETWORK_MODE:-bridge}
+
+volumes:
