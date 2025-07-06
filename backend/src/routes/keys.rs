@@ -1,23 +1,23 @@
-use axum::{response::IntoResponse, Json};
-use sequoia_openpgp::Cert;
+use axum::Json;
+use axum::response::IntoResponse;
+use crate::routes::error::AppError;
 use std::fs;
-use crate::error::AppError;
-use serde_json::json;
+use std::path::Path;
 
-pub async fn list_keys_handler() -> Result<impl IntoResponse, AppError> {
-    let files = fs::read_dir("/data/gnupg")?
-        .filter_map(|e| e.ok())
-        .filter(|e| e.path().extension().map_or(false, |ext| ext == "asc"))
-        .collect::<Vec<_>>();
+pub async fn list_keys() -> Result<impl IntoResponse, AppError> {
+    let key_dir = Path::new("/data/gnupg/keys");
+    let mut keys = vec![];
 
-    let mut key_info = vec![];
-    for file in files {
-        if let Ok(cert) = Cert::from_file(file.path()) {
-            for uid in cert.userids() {
-                key_info.push(uid.userid().to_string());
+    if key_dir.exists() {
+        for entry in fs::read_dir(key_dir)? {
+            let entry = entry?;
+            if let Some(name) = entry.file_name().to_str() {
+                keys.push(name.to_string());
             }
         }
     }
 
-    Ok(Json(json!({ "keys": key_info })))
+    Ok(Json(serde_json::json!({
+        "keys": keys
+    })))
 }
