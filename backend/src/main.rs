@@ -1,14 +1,33 @@
-pub mod middleware;
-pub mod routes;
+mod middleware;
+mod routes;
 
-use routes::{sign, verify, encrypt, decrypt, keys, key_import};
-use middleware::auth::Auth;
+use axum::{
+    routing::{get, post},
+    Router,
+};
+use routes::{decrypt, encrypt, key_import, keys, sign, verify};
+use std::net::SocketAddr;
+use tower_http::trace::TraceLayer;
+use tracing_subscriber;
 
-let app = Router::new()
-    .route("/sign", post(sign::sign))
-    .route("/verify", post(verify::verify))
-    .route("/encrypt", post(encrypt::encrypt))
-    .route("/decrypt", post(decrypt::decrypt))
-    .route("/keys/list", get(keys::list_keys))
-    .route("/keys/import", post(key_import::import_key).layer(axum::middleware::from_fn(auth)))
-    .layer(TraceLayer::new_for_http());
+#[tokio::main]
+async fn main() {
+    dotenv::dotenv().ok();
+    tracing_subscriber::fmt::init();
+
+    let app = Router::new()
+        .route("/sign", post(sign::sign))
+        .route("/verify", post(verify::verify))
+        .route("/encrypt", post(encrypt::encrypt))
+        .route("/decrypt", post(decrypt::decrypt))
+        .route("/keys/list", get(keys::list_keys))
+        .route("/keys/import", post(key_import::import_key))
+        .layer(TraceLayer::new_for_http());
+
+    let addr = SocketAddr::from(([0, 0, 0, 0], 8000));
+    println!("Listening on {}", addr);
+    axum::Server::bind(&addr)
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
+}
