@@ -1,15 +1,22 @@
-FROM rust:1.70-alpine AS builder
-RUN apk add --no-cache pkgconfig musl-dev clang openssl-dev
+FROM rust:1.76-alpine AS builder
+
+RUN apk add --no-cache musl-dev openssl-dev pkgconfig git
 
 WORKDIR /app
-COPY Cargo.toml Cargo.lock ./
-RUN mkdir src && echo "fn main() {}" > src/main.rs && cargo build --release
-COPY src ./src
+
+# Cache dependencies
+COPY backend/Cargo.toml backend/Cargo.lock ./
+COPY backend/src ./src
 RUN cargo build --release
 
-FROM alpine:3.18
+# Runtime image
+FROM alpine:latest
+
 RUN apk add --no-cache ca-certificates
+
 WORKDIR /app
-COPY --from=builder /app/target/release/backend ./backend
-EXPOSE 8000
-CMD ["./backend"]
+COPY --from=builder /app/target/release/sigma-backend .
+
+ENV RUST_LOG=info
+
+CMD ["./sigma-backend"]
