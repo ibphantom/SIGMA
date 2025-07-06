@@ -1,15 +1,20 @@
 <Container>
   <Name>SIGMA</Name>
-  <Repository>yourdockerhub/sigma</Repository>
-  <Registry>https://hub.docker.com/r/yourdockerhub/sigma</Registry>
-  <Support>https://github.com/yourusername/sigma/issues</Support>
-  <Overview>Secure digital signature and encrypted messaging platform using OpenPGP</Overview>
-  <Category>Security:Tools</Category>
+  <Repository>ibphantom/sigma</Repository>
+  <Registry>https://hub.docker.com/r/ibphantom/sigma</Registry>
+  <Support>https://github.com/ibphantom/SIGMA/issues</Support>
+  <Project>https://github.com/ibphantom/SIGMA</Project>
+  <Overview>
+    SIGMA is a secure GPG-based platform for digitally signing media and encrypted communication. 
+    Designed for individuals, developers, and government systems, SIGMA emphasizes simplicity, 
+    integrity, and modern cryptographic safety in a containerized web interface.
+  </Overview>
+  <Category>Security:Tools, Cryptography, Communications</Category>
   <WebUI>http://[IP]:[PORT:34999]</WebUI>
-  <Icon>https://raw.githubusercontent.com/yourusername/sigma/main/logo.png</Icon>
+  <Icon>https://raw.githubusercontent.com/ibphantom/SIGMA/main/icon.png</Icon>
 
-  <Config Name="AppData Config Path" Target="/data/gnupg" Default="/mnt/user/appdata/SIGMA" Type="Path" Description="Persistent key storage" Display="always" Required="true" Mask="false"/>
-  <Config Name="Frontend Port" Target="34999" Default="34999" Type="Port" Description="Port for the web UI" Display="always" Required="true" Mask="false"/>
-  <Config Name="Backend Port" Target="34998" Default="34998" Type="Port" Description="Port for the backend API" Display="always" Required="true" Mask="false"/>
-  <Config Name="Network Mode" Target="network_mode" Default="bridge" Type="Variable" Description="bridge, host, or custom docker network" Display="always" Required="false" Mask="false"/>
+  <Config Name="AppData Config Path" Target="/data/gnupg" Default="/mnt/user/appdata/SIGMA" Type="Path" Description="Persistent key storage path" Display="always" Required="true" Mask="false"/>
+  <Config Name="Frontend Port" Target="34999" Default="34999" Type="Port" Description="Web interface port" Display="always" Required="true" Mask="false"/>
+  <Config Name="Backend Port" Target="34998" Default="34998" Type="Port" Description="API service port" Display="always" Required="true" Mask="false"/>
+  <Config Name="Network Mode" Target="network_mode" Default="bridge" Type="Variable" Description="Set to bridge, host, or custom Docker network" Display="always" Required="false" Mask="false"/>
 </Container>
