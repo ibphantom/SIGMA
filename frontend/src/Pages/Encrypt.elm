@@ -1,74 +1,117 @@
-module Pages.Encrypt exposing (Msg(..), init, update, view)
+module Pages.Encrypt exposing (Model, Msg(..), init, update, view)
 
-import Browser.File exposing (File)
-import File.Select as Select
-import Html exposing (Html, button, div, input, text)
-import Html.Attributes exposing (type_)
-import Html.Events exposing (onClick)
+import Browser.Dom
+import Html exposing (..)
+import Html.Attributes exposing (..)
+import Html.Events exposing (onClick, onInput)
 import Http
+import Json.Decode as Decode
+import Json.Encode as Encode
 
 
 -- MODEL
 
 type alias Model =
-    { file : Maybe File
-    , status : String
+    { input : String
+    , result : String
+    , status : Maybe String
+    , loading : Bool
     }
 
-init : ( Model, Cmd Msg )
+init : Model
 init =
-    ( { file = Nothing, status = "" }
-    , Cmd.none
-    )
+    { input = ""
+    , result = ""
+    , status = Nothing
+    , loading = False
+    }
+
+
+-- MESSAGES
+
+type Msg
+    = InputChanged String
+    | Submit
+    | EncryptCompleted (Result Http.Error String)
 
 
 -- UPDATE
 
-type Msg
-    = FileSelected File
-    | Submit
-    | UploadResponse (Result Http.Error String)
-
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        FileSelected file ->
-            ( { model | file = Just file }, Cmd.none )
+        InputChanged str ->
+            ( { model | input = str }, Cmd.none )
 
         Submit ->
-            case model.file of
-                Just f ->
-                    let
-                        body = Http.multipartBody [ Http.filePart "file" f ]
-                        request =
-                            Http.request
-                                { method = "POST"
-                                , headers = []
-                                , url = "/encrypt"
-                                , body = body
-                                , expect = Http.expectString UploadResponse
-                                , timeout = Nothing
-                                , tracker = Nothing
-                                }
-                    in
-                    ( model, Http.send UploadResponse request )
+            if String.isEmpty model.input then
+                ( { model | status = Just "Input cannot be empty." }, Cmd.none )
+            else
+                ( { model | loading = True, status = Nothing }
+                , encryptRequest model.input
+                )
 
-                Nothing ->
-                    ( { model | status = "Please select a file." }, Cmd.none )
+        EncryptCompleted result ->
+            case result of
+                Ok body ->
+                    ( { model
+                        | result = body
+                        , loading = False
+                        , status = Just "Encryption successful."
+                      }
+                    , Cmd.none
+                    )
 
-        UploadResponse (Ok msg) ->
-            ( { model | status = "Encrypted: " ++ msg }, Cmd.none )
-
-        UploadResponse (Err err) ->
-            ( { model | status = "Error: " ++ Debug.toString err }, Cmd.none )
+                Err _ ->
+                    ( { model
+                        | loading = False
+                        , status = Just "Encryption failed. Please try again."
+                      }
+                    , Cmd.none
+                    )
 
 
 -- VIEW
 
 view : Model -> Html Msg
 view model =
-    div []
-        [ input [ type_ "file", onClick (Select.file FileSelected) ] []
-        , button [ onClick Submit ] [ text "Encrypt" ]
-        , div [] [ text model.status ]
+    div [ class "encrypt-page" ]
+        [ h2 [] [ text "Encrypt Message" ]
+        , textarea
+            [ placeholder "Enter your message here..."
+            , value model.input
+            , onInput InputChanged
+            ]
+            []
+        , button
+            [ onClick Submit, disabled model.loading ]
+            [ text (if model.loading then "Encrypting..." else "Encrypt") ]
+        , case model.status of
+            Just msg ->
+                div [ class "status" ] [ text msg ]
+
+            Nothing ->
+                text ""
+        , if not (String.isEmpty model.result) then
+            div [ class "result" ]
+                [ h3 [] [ text "Encrypted Output" ]
+                , pre [] [ text model.result ]
+                ]
+          else
+            text ""
         ]
+
+
+-- HTTP
+
+encryptRequest : String -> Cmd Msg
+encryptRequest message =
+    let
+        body =
+            Encode.object [ ( "message", Encode.string message ) ]
+    in
+    Http.post
+        { url = "/api/encrypt"
+        , body = Http.jsonBody body
+        , expect = Http.expectString EncryptCompleted
+        }
