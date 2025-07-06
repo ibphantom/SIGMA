@@ -1,28 +1,14 @@
 version: '3.8'
-
 services:
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    volumes:
-      - ${SIGMA_DATA_PATH:-/mnt/user/appdata/SIGMA}:/data/gnupg
-    ports:
-      - "${SIGMA_BACKEND_PORT:-34998}:8000"
+    build: ./backend
     environment:
-      - RUST_LOG=info
-    restart: unless-stopped
-    network_mode: ${SIGMA_NETWORK_MODE:-bridge}
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+      - AUTH_TOKEN=${AUTH_TOKEN}
+    volumes:
+      - ./data:/data/gnupg
     ports:
-      - "${SIGMA_FRONTEND_PORT:-34999}:3000"
-    depends_on:
-      - backend
-    restart: unless-stopped
-    network_mode: ${SIGMA_NETWORK_MODE:-bridge}
-
-volumes:
+      - "8000:8000"
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
