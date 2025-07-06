@@ -90,8 +90,8 @@ update msg model =
 
 view : Model -> Html Msg
 view model =
-    div []
-        [ nav []
+    div [ class "container" ]
+        [ nav [ class "navbar" ]
             [ navLink model.page Home "/" "Home"
             , text " | "
             , navLink model.page SignPage "/sign" "Sign"
@@ -104,25 +104,20 @@ view model =
             , text " | "
             , navLink model.page KeysPage "/keys" "Keys"
             ]
-        , div [] [ renderPage model.page ]
+        , div [ class "page" ] [ renderPage model.page ]
         ]
 
 
 navLink : Page -> Page -> String -> String -> Html Msg
 navLink current target url label =
     let
-        className =
+        isActive =
             if current == target then
-                "selected"
+                "active"
             else
                 ""
     in
-    a
-        [ href url
-        , class className
-        , onClick (LinkClicked (Browser.Internal (Url.fromString url |> Maybe.withDefault (Url "" "" [] Nothing))))
-        ]
-        [ text label ]
+    a [ href url, class isActive, onClick (LinkClicked (Browser.Internal (Url.fromString url |> Maybe.withDefault (Url "" "" [] Nothing)))) ] [ text label ]
 
 
 renderPage : Page -> Html msg
