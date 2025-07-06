@@ -1,17 +1,32 @@
-FROM node:18-alpine
+# Stage 1: Build Elm app
+FROM node:18-alpine AS builder
 
-# Install Elm and static server
-RUN npm install -g elm http-server
-
-# Set working directory
 WORKDIR /app
 
-# Copy source
-COPY . .
+# Install Elm
+RUN npm install -g elm
 
-# Compile Elm to JavaScript
-RUN elm make src/Main.elm --output=dist/elm.js
+# Copy Elm source code and config
+COPY elm.json ./
+COPY src ./src
 
-# Serve static files
+# Build Elm to JS (with optimization)
+RUN elm make src/Main.elm --optimize --output=dist/elm.js
+
+# Copy static HTML wrapper
+COPY dist/index.html ./dist/index.html
+
+# Stage 2: Serve static frontend
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install lightweight HTTP server
+RUN npm install -g serve
+
+# Copy built files from builder stage
+COPY --from=builder /app/dist ./dist
+
 EXPOSE 3000
-CMD ["http-server", "dist", "-p", "3000"]
+
+CMD ["serve", "dist", "-l", "3000"]
