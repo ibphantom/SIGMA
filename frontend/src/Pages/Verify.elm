@@ -1,116 +1,68 @@
-module Pages.Verify exposing (Model, Msg(..), init, update, view)
+module Pages.Verify exposing (view)
 
-import Html exposing (..)
+import Html exposing (Html, button, div, input, label, text)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onClick, onInput)
-import Http
-import Json.Decode as Decode
-import Json.Encode as Encode
+import Html.Events exposing (onClick)
+import File exposing (File)
+import File.Select as Select
 
-
--- MODEL
 
 type alias Model =
-    { message : String
-    , signature : String
-    , result : String
-    , status : Maybe String
-    , loading : Bool
-    }
-
-init : Model
-init =
-    { message = ""
-    , signature = ""
-    , result = ""
-    , status = Nothing
-    , loading = False
+    { mediaFile : Maybe File
+    , signatureFile : Maybe File
+    , status : Status
     }
 
 
--- MESSAGES
+type Status
+    = Idle
+    | Verifying
+    | Valid
+    | Invalid
+    | Error String
+
 
 type Msg
-    = MessageChanged String
-    | SignatureChanged String
+    = SelectMedia
+    | SelectSignature
+    | FileSelectedMedia File
+    | FileSelectedSignature File
     | Submit
-    | VerifyCompleted (Result Http.Error String)
+    | VerificationComplete (Result String Bool)
 
 
--- UPDATE
-
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
-    case msg of
-        MessageChanged str ->
-            ( { model | message = str }, Cmd.none )
-
-        SignatureChanged str ->
-            ( { model | signature = str }, Cmd.none )
-
-        Submit ->
-            if String.isEmpty model.message || String.isEmpty model.signature then
-                ( { model | status = Just "Message and signature are required." }, Cmd.none )
-            else
-                ( { model | loading = True, status = Nothing }
-                , verifyRequest model.message model.signature
-                )
-
-        VerifyCompleted result ->
-            case result of
-                Ok body ->
-                    ( { model | result = body, loading = False, status = Just "Verification complete." }, Cmd.none )
-
-                Err _ ->
-                    ( { model | loading = False, status = Just "Verification failed." }, Cmd.none )
+view : Html Msg
+view =
+    Html.map identity <|
+        viewInternal { mediaFile = Nothing, signatureFile = Nothing, status = Idle }
 
 
--- VIEW
-
-view : Model -> Html Msg
-view model =
-    div []
-        [ h2 [] [ text "Verify Signature" ]
-        , textarea
-            [ placeholder "Message"
-            , value model.message
-            , onInput MessageChanged
-            ]
-            []
-        , textarea
-            [ placeholder "Signature"
-            , value model.signature
-            , onInput SignatureChanged
-            ]
-            []
-        , button [ onClick Submit, disabled model.loading ]
-            [ text (if model.loading then "Verifying..." else "Verify") ]
-        , case model.status of
-            Just msg -> div [ class "status" ] [ text msg ]
-            Nothing -> text ""
-        , if not (String.isEmpty model.result) then
-            div [ class "result" ]
-                [ h3 [] [ text "Verification Result" ]
-                , pre [] [ text model.result ]
-                ]
-          else
-            text ""
+viewInternal : Model -> Html Msg
+viewInternal model =
+    div [ class "verify-page" ]
+        [ label [] [ text "Select Media File:" ]
+        , button [ onClick SelectMedia ] [ text "Choose Media" ]
+        , label [] [ text "Select Signature File:" ]
+        , button [ onClick SelectSignature ] [ text "Choose .sig" ]
+        , button [ onClick Submit ] [ text "Verify" ]
+        , viewStatus model.status
         ]
 
 
--- HTTP
+viewStatus : Status -> Html msg
+viewStatus status =
+    case status of
+        Idle ->
+            text ""
 
-verifyRequest : String -> String -> Cmd Msg
-verifyRequest msg sig =
-    let
-        body =
-            Encode.object
-                [ ( "message", Encode.string msg )
-                , ( "signature", Encode.string sig )
-                ]
-    in
-    Http.post
-        { url = "/api/verify"
-        , body = Http.jsonBody body
-        , expect = Http.expectString VerifyCompleted
-        }
+        Verifying ->
+            div [ class "status verifying" ] [ text "Verifying..." ]
+
+        Valid ->
+            div [ class "status valid" ] [ text "Signature is VALID ✅" ]
+
+        Invalid ->
+            div [ class "status invalid" ] [ text "Signature is INVALID ❌" ]
+
+        Error msg ->
+            div [ class "status error" ] [ text ("Error: " ++ msg) ]
