@@ -6,8 +6,7 @@ RUN npm install -g elm@0.19.1
 COPY frontend/elm.json ./
 COPY frontend/src ./src
 
-RUN mkdir -p dist \
- && elm make src/Main.elm --optimize --output=dist/elm.js
+RUN mkdir -p dist && elm make src/Main.elm --optimize --output=dist/elm.js
 
 FROM node:18-alpine
 WORKDIR /frontend
