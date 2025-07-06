@@ -1,5 +1,7 @@
 use axum::{http::StatusCode, response::IntoResponse};
+use tracing::info;
 
 pub async fn sign_handler() -> impl IntoResponse {
-    (StatusCode::OK, "Sign endpoint hit")
+    info!("Hit /sign endpoint");
+    (StatusCode::OK, "Sign endpoint is live")
 }
