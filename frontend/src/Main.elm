@@ -1,8 +1,9 @@
 module Main exposing (main)
 
 import Browser
-import Html exposing (Html, div, text, a, nav)
-import Html.Attributes exposing (href)
+import Html exposing (Html, a, div, nav, text)
+import Html.Attributes exposing (class, href)
+import Html.Events exposing (onClick)
 import Browser.Navigation as Nav
 import Url exposing (Url)
 import Url.Parser exposing (Parser, oneOf, s, top, map, parse)
@@ -12,6 +13,7 @@ import Pages.Verify as Verify
 import Pages.Encrypt as Encrypt
 import Pages.Decrypt as Decrypt
 import Pages.Keys as Keys
+
 
 -- ROUTES
 
@@ -24,6 +26,7 @@ type Page
     | KeysPage
     | NotFound
 
+
 routeParser : Parser (Page -> a) a
 routeParser =
     oneOf
@@ -35,12 +38,14 @@ routeParser =
         , map KeysPage (s "keys")
         ]
 
+
 -- MODEL
 
 type alias Model =
     { key : Nav.Key
     , page : Page
     }
+
 
 -- INIT
 
@@ -54,11 +59,13 @@ init _ url key =
     in
     ( { key = key, page = page }, Cmd.none )
 
+
 -- UPDATE
 
 type Msg
     = LinkClicked Browser.UrlRequest
     | UrlChanged Url
+
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
@@ -71,11 +78,13 @@ update msg model =
 
         UrlChanged url ->
             let
-                page = case parse routeParser url of
-                    Just p -> p
-                    Nothing -> NotFound
+                page =
+                    case parse routeParser url of
+                        Just p -> p
+                        Nothing -> NotFound
             in
             ( { model | page = page }, Cmd.none )
+
 
 -- VIEW
 
@@ -83,20 +92,38 @@ view : Model -> Html Msg
 view model =
     div []
         [ nav []
-            [ a [ href "/" ] [ text "Home" ]
+            [ navLink model.page Home "/" "Home"
             , text " | "
-            , a [ href "/sign" ] [ text "Sign" ]
+            , navLink model.page SignPage "/sign" "Sign"
             , text " | "
-            , a [ href "/verify" ] [ text "Verify" ]
+            , navLink model.page VerifyPage "/verify" "Verify"
             , text " | "
-            , a [ href "/encrypt" ] [ text "Encrypt" ]
+            , navLink model.page EncryptPage "/encrypt" "Encrypt"
             , text " | "
-            , a [ href "/decrypt" ] [ text "Decrypt" ]
+            , navLink model.page DecryptPage "/decrypt" "Decrypt"
             , text " | "
-            , a [ href "/keys" ] [ text "Keys" ]
+            , navLink model.page KeysPage "/keys" "Keys"
             ]
         , div [] [ renderPage model.page ]
         ]
+
+
+navLink : Page -> Page -> String -> String -> Html Msg
+navLink current target url label =
+    let
+        className =
+            if current == target then
+                "selected"
+            else
+                ""
+    in
+    a
+        [ href url
+        , class className
+        , onClick (LinkClicked (Browser.Internal (Url.fromString url |> Maybe.withDefault (Url "" "" [] Nothing))))
+        ]
+        [ text label ]
+
 
 renderPage : Page -> Html msg
 renderPage page =
@@ -108,6 +135,7 @@ renderPage page =
         DecryptPage -> Decrypt.view
         KeysPage -> Keys.view
         NotFound -> div [] [ text "404 - Page Not Found" ]
+
 
 -- MAIN
 
