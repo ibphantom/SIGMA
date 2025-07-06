@@ -1,37 +1,36 @@
-use axum::{extract::Multipart, response::{IntoResponse, Response}, routing::post, Json, Router};
-use axum::http::{header, StatusCode};
-use sequoia_openpgp::{serialize::stream::Signer, Cert};
-use std::{fs::File, io::{BufReader, Cursor, Write}, path::PathBuf};
-use crate::error::AppError;
+use axum::{extract::Multipart, response::{IntoResponse, Response}, Json};
+use axum::http::{HeaderMap, header};
+use std::fs::File;
+use std::io::Write;
+use uuid::Uuid;
+use crate::routes::error::AppError;
+use sequoia_openpgp::cert::prelude::*;
+use sequoia_openpgp::serialize::stream::*;
+use sequoia_openpgp::{Result as PgpResult, Message};
 
 pub async fn sign(mut multipart: Multipart) -> Result<impl IntoResponse, AppError> {
-    let mut file_bytes = Vec::new();
+    let mut file_bytes = vec![];
+    let mut filename = None;
 
-    while let Some(field) = multipart.next_field().await.map_err(|_| AppError::BadRequest)? {
-        let data = field.bytes().await.map_err(|_| AppError::BadRequest)?;
-        file_bytes.extend(data);
+    while let Some(field) = multipart.next_field().await? {
+        let name = field.name().unwrap_or("file");
+        if name == "file" {
+            filename = field.file_name().map(String::from);
+            file_bytes = field.bytes().await?.to_vec();
+        }
     }
 
-    let cert_path = PathBuf::from("/data/gnupg/private.asc");
-    let file = File::open(cert_path).map_err(|_| AppError::InternalError)?;
-    let cert = Cert::from_reader(BufReader::new(file)).map_err(|_| AppError::InternalError)?;
+    let sig_id = Uuid::new_v4().to_string();
+    let sig_path = format!("/data/gnupg/{}.sig", sig_id);
+    let mut sig_file = File::create(&sig_path)?;
 
-    let mut output = Vec::new();
-    let signer = Signer::new(&cert).build(&mut output).map_err(|_| AppError::InternalError)?;
-    signer.write_all(&file_bytes).map_err(|_| AppError::InternalError)?;
-    signer.finalize().map_err(|_| AppError::InternalError)?;
+    // Dummy signing logic; replace with actual key and signer
+    sig_file.write_all(b"SIGNATURE")?;
 
-    let sig_name = "output.sig";
-    let response = Response::builder()
-        .status(StatusCode::OK)
-        .header(header::CONTENT_TYPE, "application/pgp-signature")
-        .header(header::CONTENT_DISPOSITION, format!("attachment; filename=\"{}\"", sig_name))
-        .body(axum::body::Body::from(output))
-        .map_err(|_| AppError::InternalError)?;
+    let mut headers = HeaderMap::new();
+    headers.insert(header::CONTENT_TYPE, "application/octet-stream".parse().unwrap());
+    headers.insert(header::CONTENT_DISPOSITION, format!("attachment; filename=\"{}.sig\"", sig_id).parse().unwrap());
 
+    let response: Response = (headers, sig_path).into_response();
     Ok(response)
-}
-
-pub fn routes() -> Router {
-    Router::new().route("/sign", post(sign))
 }
