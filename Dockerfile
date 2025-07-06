@@ -1,25 +1,34 @@
-# ====== Stage 1: Build Elm Frontend ======
+# Build Frontend
 FROM node:18-alpine AS frontend-builder
-WORKDIR /app/frontend
+WORKDIR /frontend
 RUN npm install -g elm@0.19.1
-COPY frontend/elm.json frontend/src/ ./
+COPY frontend/elm.json frontend/src/ ./ 
 RUN mkdir -p dist && elm make src/Main.elm --optimize --output=dist/elm.js
-COPY frontend/dist ./dist
 
-# ====== Stage 2: Build Rust Backend ======
-FROM rust:1.77 as backend-builder
-WORKDIR /app/backend
-COPY backend ./backend
-RUN apt-get update && apt-get install -y clang pkg-config libssl-dev
+# Build Backend
+FROM rust:1.70-slim-buster AS backend-builder
+WORKDIR /backend
+COPY backend/ ./
 RUN cargo build --release
 
-# ====== Stage 3: Final Container ======
-FROM alpine:3.18
-RUN apk add --no-cache openssl
+# Final Image
+FROM debian:bullseye-slim
 WORKDIR /app
-COPY --from=frontend-builder /app/frontend/dist ./frontend
-COPY --from=backend-builder /app/backend/target/release/backend ./backend
-COPY template.xml ./template.xml
-COPY .env.example .env
+
+# Copy Backend Binary
+COPY --from=backend-builder /backend/target/release/sigma-backend ./sigma-backend
+
+# Copy Frontend Files
+COPY --from=frontend-builder /frontend/dist ./frontend
+
+# Copy public assets and configuration
+COPY backend/static ./static
+
+# Environment and ports
+ENV RUST_LOG=info
+ENV SIGMA_FRONTEND_PORT=34999
+ENV SIGMA_BACKEND_PORT=34998
 EXPOSE 34998
-CMD ["./backend"]
+EXPOSE 34999
+
+CMD ["./sigma-backend"]
