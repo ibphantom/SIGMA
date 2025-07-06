@@ -1,0 +1,31 @@
+# === Rust (Backend) ===
+/backend/target/
+**/*.rs.bk
+Cargo.lock
+
+# === Elm (Frontend) ===
+/frontend/elm-stuff/
+/frontend/node_modules/
+/frontend/dist/
+*.js
+*.js.map
+
+# === Docker & Build Artifacts ===
+*.log
+*.bak
+.env
+docker-compose.override.yml
+
+# === GPG Keyring (Persisted Data) ===
+/data/gnupg/
+**/gnupg/
+*.gpg
+*.sig
+
+# === Editor / IDE ===
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
