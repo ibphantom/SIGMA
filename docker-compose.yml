@@ -1,20 +1,24 @@
 version: '3.8'
 
 services:
-  backend:
-    build: ./backend
-    environment:
+  sigma:
+    container_name: sigma
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "34998:34998"
     volumes:
-      - ./data:/data/gnupg
-    ports:
-      - "8000:8000"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
+      - sigma_data:/app/data
+    environment:
+      - SIGMA_ENV=production
+      - SIGMA_PORT=34998
+    restart: unless-stopped
+    networks:
+      - sigma_net
 
-  frontend:
-    build: ./frontend
-    ports:
-      - "3000:3000"
+volumes:
+  sigma_data:
+
+networks:
+  sigma_net:
