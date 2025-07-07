@@ -1,20 +1,26 @@
 <Container>
   <Name>SIGMA</Name>
-  <Repository>ibphantom/sigma</Repository>
-  <Registry>https://hub.docker.com/r/ibphantom/sigma</Registry>
-  <Support>https://github.com/ibphantom/SIGMA/issues</Support>
-  <Project>https://github.com/ibphantom/SIGMA</Project>
-  <Overview>
-    SIGMA is a secure GPG-based platform for digitally signing media and encrypted communication. 
-    Designed for individuals, developers, and government systems, SIGMA emphasizes simplicity, 
-    integrity, and modern cryptographic safety in a containerized web interface.
-  </Overview>
-  <Category>Security:Tools, Cryptography, Communications</Category>
-  <WebUI>http://[IP]:[PORT:34999]</WebUI>
-  <Icon>https://raw.githubusercontent.com/ibphantom/SIGMA/main/icon.png</Icon>
-
-  <Config Name="AppData Config Path" Target="/data/gnupg" Default="/mnt/user/appdata/SIGMA" Type="Path" Description="Persistent key storage path" Display="always" Required="true" Mask="false"/>
-  <Config Name="Frontend Port" Target="34999" Default="34999" Type="Port" Description="Web interface port" Display="always" Required="true" Mask="false"/>
-  <Config Name="Backend Port" Target="34998" Default="34998" Type="Port" Description="API service port" Display="always" Required="true" Mask="false"/>
-  <Config Name="Network Mode" Target="network_mode" Default="bridge" Type="Variable" Description="Set to bridge, host, or custom Docker network" Display="always" Required="false" Mask="false"/>
+  <Repository>localbuild/sigma</Repository>
+  <Registry></Registry>
+  <Network>bridge</Network>
+  <MyIP></MyIP>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/your-org/sigma</Support>
+  <Project>https://github.com/your-org/sigma</Project>
+  <Overview>This container provides a secure web interface for digitally signing media and communicating via GPG encryption. Built using Rust and Elm.</Overview>
+  <Category>Security:Tools, Network:Utilities, Productivity</Category>
+  <WebUI>http://[IP]:[PORT:34998]</WebUI>
+  <Icon>https://raw.githubusercontent.com/your-org/sigma/main/logo.png</Icon>
+  <ExtraParams></ExtraParams>
+  <PostArgs></PostArgs>
+  <CPUset></CPUset>
+  <Date></Date>
+  <DonateText></DonateText>
+  <DonateLink></DonateLink>
+  <Requires></Requires>
+  <Config Name="AppData Config Path" Target="/app/data" Default="/mnt/user/appdata/SIGMA" Mode="rw" Description="Container persistent data location." Type="Path" />
+  <Config Name="Web Port" Target="34998" Default="34998" Mode="tcp" Description="Frontend/backend web access port." Type="Port" />
+  <Environment Name="SIGMA_ENV" Default="production" Description="Set the runtime environment." />
+  <Environment Name="SIGMA_PORT" Default="34998" Description="Set the backend listening port." />
 </Container>
