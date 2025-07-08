@@ -1,20 +1,33 @@
-use axum::http::request::Parts;
-use axum::extract::FromRequestParts;
-use async_trait::async_trait;
-use axum::http::StatusCode;
+use axum::{Json, response::IntoResponse};
+use serde::{Deserialize, Serialize};
+use crate::routes::error::AppError;
 
-#[derive(Debug)]
-pub struct Auth;
+#[derive(Debug, Deserialize)]
+pub struct AuthRequest {
+    pub username: String,
+    pub password: String,
+}
 
-#[async_trait]
-impl<S> FromRequestParts<S> for Auth
-where
-    S: Send + Sync,
-{
-    type Rejection = StatusCode;
+#[derive(Debug, Serialize)]
+pub struct AuthResponse {
+    pub success: bool,
+    pub token: Option<String>,
+    pub message: String,
+}
 
-    async fn from_request_parts(_parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        // Placeholder: allow all for now
-        Ok(Auth)
+pub async fn auth(Json(payload): Json<AuthRequest>) -> Result<impl IntoResponse, AppError> {
+    if payload.username == "admin" && payload.password == "admin" {
+        let token = "mock-token-123";
+        Ok(Json(AuthResponse {
+            success: true,
+            token: Some(token.to_string()),
+            message: "Authentication successful".into(),
+        }))
+    } else {
+        Ok(Json(AuthResponse {
+            success: false,
+            token: None,
+            message: "Invalid credentials".into(),
+        }))
     }
 }
