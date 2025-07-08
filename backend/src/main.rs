@@ -1,40 +1,43 @@
+mod routes;
+
 use axum::{
     routing::{get, post},
-    Router, Json, extract::Multipart, http::StatusCode,
+    Router,
 };
+use routes::{decrypt, encrypt, key_import, keys, sign, verify, auth::auth};
 use std::net::SocketAddr;
-use tower_http::services::ServeDir;
-
-mod routes;
-use routes::{
-    sign::sign,
-    verify::verify,
-    encrypt::encrypt,
-    decrypt::decrypt,
-    keys::list_keys,
-    key_import::import_key,
-    auth::auth,
-    error::AppError,
+use tower_http::{
+    trace::TraceLayer,
+    cors::{CorsLayer, Any},
 };
+use tracing_subscriber;
 
 #[tokio::main]
-async fn main() -> Result<(), AppError> {
-    let app = Router::new()
-        .route("/api/sign", post(sign))
-        .route("/api/verify", post(verify))
-        .route("/api/encrypt", post(encrypt))
-        .route("/api/decrypt", post(decrypt))
-        .route("/api/keys", get(list_keys))
-        .route("/api/import-key", post(import_key))
-        .route("/api/auth", post(auth))
-        .nest_service("/", ServeDir::new("/dist").append_index_html_on_directories(true));
+async fn main() {
+    dotenv::dotenv().ok();
+    tracing_subscriber::fmt::init();
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
+    let app = Router::new()
+        .route("/api/sign", post(sign::sign))
+        .route("/api/verify", post(verify::verify))
+        .route("/api/encrypt", post(encrypt::encrypt))
+        .route("/api/decrypt", post(decrypt::decrypt))
+        .route("/api/keys/list", get(keys::list_keys))
+        .route("/api/keys/import", post(key_import::import_key))
+        .route("/api/auth", post(auth))
+        .layer(
+            CorsLayer::new()
+                .allow_origin(Any)
+                .allow_methods(Any)
+                .allow_headers(Any),
+        )
+        .layer(TraceLayer::new_for_http());
+
+    let addr = SocketAddr::from(([0, 0, 0, 0], 34998));
     println!("Listening on http://{}", addr);
 
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
-        .await?;
-
-    Ok(())
+        .await
+        .unwrap();
 }
