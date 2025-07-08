@@ -1,38 +1,40 @@
-mod middleware;
-mod routes;
-
 use axum::{
     routing::{get, post},
-    Router,
+    Router, Json, extract::Multipart, http::StatusCode,
 };
-use routes::{decrypt, encrypt, key_import, keys, sign, verify};
 use std::net::SocketAddr;
-use tower_http::trace::TraceLayer;
-use tracing_subscriber;
+use tower_http::services::ServeDir;
+
+mod routes;
+use routes::{
+    sign::sign,
+    verify::verify,
+    encrypt::encrypt,
+    decrypt::decrypt,
+    keys::list_keys,
+    key_import::import_key,
+    auth::auth,
+    error::AppError,
+};
 
 #[tokio::main]
-async fn main() {
-    dotenv::dotenv().ok();
-    tracing_subscriber::fmt::init();
-
-    let port: u16 = std::env::var("SIGMA_PORT")
-        .unwrap_or_else(|_| "34998".into())
-        .parse()
-        .expect("Invalid SIGMA_PORT");
-
+async fn main() -> Result<(), AppError> {
     let app = Router::new()
-        .route("/sign", post(sign::sign))
-        .route("/verify", post(verify::verify))
-        .route("/encrypt", post(encrypt::encrypt))
-        .route("/decrypt", post(decrypt::decrypt))
-        .route("/keys/list", get(keys::list_keys))
-        .route("/keys/import", post(key_import::import_key))
-        .layer(TraceLayer::new_for_http());
+        .route("/api/sign", post(sign))
+        .route("/api/verify", post(verify))
+        .route("/api/encrypt", post(encrypt))
+        .route("/api/decrypt", post(decrypt))
+        .route("/api/keys", get(list_keys))
+        .route("/api/import-key", post(import_key))
+        .route("/api/auth", post(auth))
+        .nest_service("/", ServeDir::new("/dist").append_index_html_on_directories(true));
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], port));
-    println!("Listening on {}", addr);
+    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
+    println!("Listening on http://{}", addr);
+
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
-        .await
-        .unwrap();
+        .await?;
+
+    Ok(())
 }
