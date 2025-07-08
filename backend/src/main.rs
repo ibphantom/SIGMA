@@ -1,42 +1,43 @@
-mod routes;
-
 use axum::{
+    http::StatusCode,
+    response::Json,
     routing::{get, post},
     Router,
 };
-use routes::{decrypt, encrypt, key_import, keys, sign, verify, auth::auth};
-use std::net::SocketAddr;
-use tower_http::{
-    trace::TraceLayer,
-    cors::{CorsLayer, Any},
-};
-use tracing_subscriber;
+use serde::{Deserialize, Serialize};
+use tower_http::cors::CorsLayer;
+
+#[derive(Serialize, Deserialize)]
+struct SignRequest {
+    message: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct SignResponse {
+    signature: String,
+}
+
+async fn sign_message(Json(payload): Json<SignRequest>) -> Json<SignResponse> {
+    // Placeholder - implement actual signing with sequoia-openpgp
+    Json(SignResponse {
+        signature: format!("SIGNED: {}", payload.message),
+    })
+}
+
+async fn health_check() -> StatusCode {
+    StatusCode::OK
+}
 
 #[tokio::main]
 async fn main() {
-    dotenv::dotenv().ok();
-    tracing_subscriber::fmt::init();
-
     let app = Router::new()
-        .route("/api/sign", post(sign::sign))
-        .route("/api/verify", post(verify::verify))
-        .route("/api/encrypt", post(encrypt::encrypt))
-        .route("/api/decrypt", post(decrypt::decrypt))
-        .route("/api/keys/list", get(keys::list_keys))
-        .route("/api/keys/import", post(key_import::import_key))
-        .route("/api/auth", post(auth))
-        .layer(
-            CorsLayer::new()
-                .allow_origin(Any)
-                .allow_methods(Any)
-                .allow_headers(Any),
-        )
-        .layer(TraceLayer::new_for_http());
+        .route("/health", get(health_check))
+        .route("/sign", post(sign_message))
+        .layer(CorsLayer::permissive());
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], 34998));
-    println!("Listening on http://{}", addr);
-
-    axum::Server::bind(&addr)
+    println!("Server running on http://0.0.0.0:8080");
+    
+    axum::Server::bind(&"0.0.0.0:8080".parse().unwrap())
         .serve(app.into_make_service())
         .await
         .unwrap();
