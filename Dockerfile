@@ -1,38 +1,19 @@
-# Stage 1: Build Frontend (Elm)
-FROM node:18-alpine AS frontend-builder
-WORKDIR /frontend
+FROM rust:1.70-alpine AS builder
 
-RUN npm install -g elm@0.19.1
+RUN apk add --no-cache musl-dev pkgconfig openssl-dev
 
-COPY frontend/elm.json ./
-COPY frontend/src ./src
+WORKDIR /app
+COPY Cargo.toml Cargo.lock ./
+RUN mkdir src && echo "fn main() {}" > src/main.rs
+RUN cargo build --release
+RUN rm -rf src
 
-RUN mkdir -p dist \
-    && elm make src/Main.elm --optimize --output=dist/elm.js
-
-# Stage 2: Build Backend (Rust)
-FROM rust:1.70-slim-buster AS backend-builder
-WORKDIR /backend
-
-RUN apt-get update && apt-get install -y \
-    pkg-config libssl-dev clang cmake build-essential curl gnupg git \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY backend/Cargo.toml backend/Cargo.lock ./
-COPY backend/src ./src
-
+COPY src ./src
 RUN cargo build --release
 
-# Stage 3: Final Runtime Image
-FROM debian:bullseye-slim AS final
+FROM alpine:latest
+RUN apk add --no-cache ca-certificates
 WORKDIR /app
-
-RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
-
-COPY --from=backend-builder /backend/target/release/sigma-backend ./
-COPY --from=frontend-builder /frontend/dist ./dist
-
-RUN mkdir -p /app/data/gnupg/keys && ln -s /app/data /data
-
-EXPOSE 34998
+COPY --from=builder /app/target/release/sigma-backend /app/
+EXPOSE 8080
 CMD ["./sigma-backend"]
