@@ -1,101 +1,63 @@
-module Sign exposing (Model, Msg(..), init, update, view)
+module Pages.Sign exposing (view)
 
-import Html exposing (..)
+import Html exposing (Html, button, div, input, label, text)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
-import Http
-import Json.Decode as Decode
-import Json.Encode as Encode
+import File exposing (File)
+import File.Select as Select
 
-
--- MODEL
 
 type alias Model =
-    { input : String
-    , result : String
-    , status : Maybe String
-    , loading : Bool
-    }
-
-init : Model
-init =
-    { input = ""
-    , result = ""
-    , status = Nothing
-    , loading = False
+    { selectedFile : Maybe File
+    , status : Status
     }
 
 
--- MESSAGES
+type Status
+    = Idle
+    | Uploading
+    | Success String
+    | Failure String
+
 
 type Msg
-    = InputChanged String
+    = SelectFile
+    | FileSelected File
     | Submit
-    | SignCompleted (Result Http.Error String)
+    | UploadComplete (Result String String)
 
 
--- UPDATE
-
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
-    case msg of
-        InputChanged str ->
-            ( { model | input = str }, Cmd.none )
-
-        Submit ->
-            if String.isEmpty model.input then
-                ( { model | status = Just "Input cannot be empty." }, Cmd.none )
-            else
-                ( { model | loading = True, status = Nothing }
-                , signRequest model.input
-                )
-
-        SignCompleted result ->
-            case result of
-                Ok body ->
-                    ( { model | result = body, loading = False, status = Just "Signed successfully." }, Cmd.none )
-
-                Err _ ->
-                    ( { model | loading = False, status = Just "Signing failed." }, Cmd.none )
+view : Html Msg
+view =
+    Html.map identity <|
+        viewInternal { selectedFile = Nothing, status = Idle }
 
 
--- VIEW
-
-view : Model -> Html Msg
-view model =
-    div []
-        [ h2 [] [ text "Sign Message" ]
-        , textarea
-            [ placeholder "Enter text to sign..."
-            , value model.input
-            , onInput InputChanged
-            ]
-            []
-        , button [ onClick Submit, disabled model.loading ]
-            [ text (if model.loading then "Signing..." else "Sign") ]
-        , case model.status of
-            Just msg -> div [ class "status" ] [ text msg ]
-            Nothing -> text ""
-        , if not (String.isEmpty model.result) then
-            div [ class "result" ]
-                [ h3 [] [ text "Signature" ]
-                , pre [] [ text model.result ]
-                ]
-          else
-            text ""
+viewInternal : Model -> Html Msg
+viewInternal model =
+    div [ class "sign-page" ]
+        [ label [] [ text "Select a file to sign:" ]
+        , button [ onClick SelectFile ] [ text "Choose File" ]
+        , input [ type_ "file", style "display" "none", id "fileInput", onInput (\_ -> Submit) ] []
+        , button [ onClick Submit ] [ text "Sign" ]
+        , viewStatus model.status
         ]
 
 
--- HTTP
+viewStatus : Status -> Html msg
+viewStatus status =
+    case status of
+        Idle ->
+            text ""
 
-signRequest : String -> Cmd Msg
-signRequest message =
-    let
-        body =
-            Encode.object [ ( "message", Encode.string message ) ]
-    in
-    Http.post
-        { url = "/api/sign"
-        , body = Http.jsonBody body
-        , expect = Http.expectString SignCompleted
-        }
+        Uploading ->
+            div [ class "status uploading" ] [ text "Signing..." ]
+
+        Success link ->
+            div [ class "status success" ]
+                [ text "Signed successfully. "
+                , Html.a [ href link, download "signature.sig" ] [ text "Download .sig" ]
+                ]
+
+        Failure err ->
+            div [ class "status error" ] [ text ("Error: " ++ err) ]
