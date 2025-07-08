@@ -2,7 +2,7 @@ module Pages.Encrypt exposing (view)
 
 import Html exposing (Html, div, input, button, label, text)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onClick)
+import Html.Events exposing (onClick, onInput)
 import File exposing (File)
 import File.Select as Select
 
