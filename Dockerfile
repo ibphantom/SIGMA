@@ -1,6 +1,6 @@
 ### Stage 1 - Build Frontend (Elm)
 FROM node:18-alpine AS frontend-builder
-WORKDIR /app/frontend
+WORKDIR /frontend
 
 # Install Elm
 RUN npm install -g elm@0.19.1
@@ -16,7 +16,7 @@ RUN mkdir -p dist \
 
 ### Stage 2 - Build Backend (Rust)
 FROM rust:1.70-slim-buster AS backend-builder
-WORKDIR /app/backend
+WORKDIR /backend
 
 # Install dependencies
 RUN apt-get update && apt-get install -y \
@@ -39,10 +39,10 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 
 # Copy backend binary
-COPY --from=backend-builder /app/backend/target/release/sigma-backend ./
+COPY --from=backend-builder /backend/target/release/sigma-backend ./
 
 # Copy frontend output
-COPY --from=frontend-builder /app/frontend/dist ./dist
+COPY --from=frontend-builder /frontend/dist ./dist
 
 # Expose port
 EXPOSE 34998
